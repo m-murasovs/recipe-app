@@ -26,10 +26,10 @@ interface RecipeRaw {
     [key: string]: string;
 }
 
-interface Ingredient {
+interface IngredientWithMeasure {
     item: string;
     measure: string;
-}
+};
 
 interface Recipe {
     idMeal: string;
@@ -38,11 +38,13 @@ interface Recipe {
     strInstructions: string;
     strMealThumb: string;
     strYoutube: string;
-    ingredients: Ingredient[];
+    ingredients: string[];
+    ingredientsWithMeasures: IngredientWithMeasure[];
 }
 
 const INGREDIENTS_LIST_URL = 'https://www.themealdb.com/api/json/v1/1/list.php?i=list';
 const MEAL_BY_INGREDIENT_URL = 'https://www.themealdb.com/api/json/v1/1/filter.php?i=';
+const MEAL_LOOKUP_URL = 'https://www.themealdb.com/api/json/v1/1/lookup.php?i=';
 
 const getMealByIngredientUrl = (ingredient) => {
     return `${MEAL_BY_INGREDIENT_URL}${ingredient.toLowerCase().replace(' ', '_')}`;
@@ -52,7 +54,8 @@ const getMealByIngredientUrl = (ingredient) => {
  * Transform the recipes into usable objects, where the ingredients are an array
  */
 const processRecipe = (recipe: RecipeRaw): Recipe => {
-    const ingredients: any = [];
+    const ingredients: string[] = [];
+    const ingredientsWithMeasures: IngredientWithMeasure[] = [];
 
     for (let i = 1; i <= 20; i++) {
         const item = recipe[`strIngredient${i}`];
@@ -60,9 +63,10 @@ const processRecipe = (recipe: RecipeRaw): Recipe => {
         if (!item) {
             break;
         }
-        ingredients.push({ item, measure } as Ingredient);
+        ingredients.push(item);
+        ingredientsWithMeasures.push({ item, measure });
     }
-
+    console.log('recipe', recipe)
     return {
         idMeal: recipe.idMeal,
         strMeal: recipe.strMeal,
@@ -71,6 +75,7 @@ const processRecipe = (recipe: RecipeRaw): Recipe => {
         strMealThumb: recipe.strMealThumb,
         strYoutube: recipe.strYoutube,
         ingredients,
+        ingredientsWithMeasures,
     };
 };
 
@@ -149,11 +154,8 @@ const App = () => {
                 return;
             }
 
-            // Fetch the recipes for the possible meals
-            const mealUrls = data.meals.map(meal => {
-                return `https://www.themealdb.com/api/json/v1/1/lookup.php?i=${meal.idMeal}`;
-            });
-
+            // Fetch the recipes for the possible meals and process them
+            const mealUrls = data.meals.map(meal => `${MEAL_LOOKUP_URL}${meal.idMeal}`);
             const recipes = await Promise.all(
                 mealUrls.map(async (url) => {
                     const response = await fetch(url);
@@ -162,7 +164,7 @@ const App = () => {
                     return recipeData.meals[0];
                 })
             );
-
+            console.log(recipes)
             const processedRecipes = recipes.map(rec => processRecipe(rec));
 
             setMealsByIngredientError('');
@@ -174,8 +176,6 @@ const App = () => {
         }
     };
 
-    console.log(mealsByIngredient);
-
     return (
         <>
             <div>
@@ -184,7 +184,7 @@ const App = () => {
                 <div>
                     What is your main ingredient?
                     <input type="text" value={mainIngredient} onChange={handleMainIngredientInput} />
-                    <div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                         {ingredientNotFoundError
                             ? <div>Nothing found</div>
                             : mainIngredientOptions.map(opt => {
