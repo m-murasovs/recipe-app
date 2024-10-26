@@ -13,7 +13,7 @@ interface MealByIngredient {
     idMeal: string;
 }
 
-interface Recipe {
+interface RecipeRaw {
     idMeal: string;
     strMeal: string;
     strDrinkAlternate: string;
@@ -23,50 +23,22 @@ interface Recipe {
     strMealThumb: string;
     strTags: string;
     strYoutube: string;
-    strIngredient1: string;
-    strIngredient2: string;
-    strIngredient3: string;
-    strIngredient4: string;
-    strIngredient5: string;
-    strIngredient6: string;
-    strIngredient7: string;
-    strIngredient8: string;
-    strIngredient9: string;
-    strIngredient10: string;
-    strIngredient11: string;
-    strIngredient12: string;
-    strIngredient13: string;
-    strIngredient14: string;
-    strIngredient15: string;
-    strIngredient16: string;
-    strIngredient17: string;
-    strIngredient18: string;
-    strIngredient19: string;
-    strIngredient20: string;
-    strMeasure1: string;
-    strMeasure2: string;
-    strMeasure3: string;
-    strMeasure4: string;
-    strMeasure5: string;
-    strMeasure6: string;
-    strMeasure7: string;
-    strMeasure8: string;
-    strMeasure9: string;
-    strMeasure10: string;
-    strMeasure11: string;
-    strMeasure12: string;
-    strMeasure13: string;
-    strMeasure14: string;
-    strMeasure15: string;
-    strMeasure16: string;
-    strMeasure17: string;
-    strMeasure18: string;
-    strMeasure19: string;
-    strMeasure20: string;
-    strSource: string;
-    strImageSource: string;
-    strCreativeCommonsConfirmed: string;
-    dateModified: string;
+    [key: string]: string;
+}
+
+interface Ingredient {
+    item: string;
+    measure: string;
+}
+
+interface Recipe {
+    idMeal: string;
+    strMeal: string;
+    strArea: string;
+    strInstructions: string;
+    strMealThumb: string;
+    strYoutube: string;
+    ingredients: Ingredient[];
 }
 
 const INGREDIENTS_LIST_URL = 'https://www.themealdb.com/api/json/v1/1/list.php?i=list';
@@ -76,9 +48,31 @@ const getMealByIngredientUrl = (ingredient) => {
     return `${MEAL_BY_INGREDIENT_URL}${ingredient.toLowerCase().replace(' ', '_')}`;
 };
 
-// const processRecipe = (recipe) => {
+/**
+ * Transform the recipes into usable objects, where the ingredients are an array
+ */
+const processRecipe = (recipe: RecipeRaw): Recipe => {
+    const ingredients: any = [];
 
-// };
+    for (let i = 1; i <= 20; i++) {
+        const item = recipe[`strIngredient${i}`];
+        const measure = recipe[`strMeasure${i}`];
+        if (!item) {
+            break;
+        }
+        ingredients.push({ item, measure } as Ingredient);
+    }
+
+    return {
+        idMeal: recipe.idMeal,
+        strMeal: recipe.strMeal,
+        strArea: recipe.strArea,
+        strInstructions: recipe.strInstructions,
+        strMealThumb: recipe.strMealThumb,
+        strYoutube: recipe.strYoutube,
+        ingredients,
+    };
+};
 
 const App = () => {
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -163,14 +157,16 @@ const App = () => {
             const recipes = await Promise.all(
                 mealUrls.map(async (url) => {
                     const response = await fetch(url);
-                    const recipeData = await response.json() as { meals: Recipe[]; };
+                    const recipeData = await response.json() as { meals: RecipeRaw[]; };
                     // The meals is an array with one item, so this pulls the item out
                     return recipeData.meals[0];
                 })
             );
 
+            const processedRecipes = recipes.map(rec => processRecipe(rec));
+
             setMealsByIngredientError('');
-            setMealsByIngredient(recipes);
+            setMealsByIngredient(processedRecipes);
         } catch (error) {
             console.error(error);
         } finally {
