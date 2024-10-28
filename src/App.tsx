@@ -1,4 +1,4 @@
-import React, { ChangeEvent, MouseEventHandler, useEffect, useState } from 'react';
+import React, { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import './App.css';
 import { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types';
 import { getMealByIngredientUrl, INGREDIENTS_LIST_URL, MEAL_LOOKUP_URL, processRecipe } from './helpers';
@@ -9,8 +9,6 @@ const App = () => {
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
     const [mainIngredient, setMainIngredient] = useState('');
-    const [mainIngredientOptions, setMainIngredientOptions] = useState<Ingredient[]>([]);
-    const [MainingredientNotFoundError, setMainIngredientNotFoundError] = useState(false);
 
     const [mealsByIngredient, setMealsByIngredient] = useState<Recipe[]>([]);
     // The error shows the ingredient we couldn't find any meals for
@@ -40,33 +38,24 @@ const App = () => {
         fetchIngredients();
     }, []); // Load ingredients only once
 
-    /**
-     * Get the ingredients that start with the input
-     */
-    const handleMainIngredientInput = (e: ChangeEvent<HTMLInputElement>) => {
-        e.preventDefault();
-        setMainIngredient(e.target.value);
-        const value = e.target.value.toLowerCase();
-
-        const options = value
-            ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(value))
+    /** Get the ingredients that start with the input */
+    const renderMainIngredientOptions = () => {
+        const options = mainIngredient.length
+            ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(mainIngredient.toLowerCase()))
             : [];
 
-        // Clear the fetched meals if the user deletes the input
-        if (!value.length) {
-            setMainIngredient('');
-            setMealsByIngredient([]);
-        }
+        if (mainIngredient.length && !options.length) return <div>Nothing found</div>;
 
-        if (value.length && !options.length) {
-            setMainIngredientNotFoundError(true);
-        } else {
-            setMainIngredientNotFoundError(false);
-            setMainIngredientOptions(options);
-        };
+        return options.map(opt => {
+            return <div key={opt.strIngredient}>
+                <button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
+                    {opt.strIngredient}
+                </button>
+            </div>;
+        });
     };
 
-    const handleMainIngredientButtonClick = async (ingredient) => {
+    const handleMainIngredientButtonClick = async (ingredient: string) => {
         setMainIngredient(ingredient);
         const mealByIngredientUrl = getMealByIngredientUrl(ingredient);
 
@@ -94,7 +83,6 @@ const App = () => {
                     return recipeData.meals[0];
                 })
             );
-            console.log(recipes)
             const processedRecipes = recipes.map(rec => processRecipe(rec));
 
             setMealsByIngredientError('');
@@ -117,7 +105,7 @@ const App = () => {
         setOtherIngredientOptions(options);
     };
 
-    const handleOtherIngredientClick = (ingredient) => {
+    const handleOtherIngredientClick = (ingredient: string) => {
         // Only add the other ingredients once
         setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient]);
     };
@@ -126,14 +114,12 @@ const App = () => {
         setOtherIngredients(prev => prev.filter(item => item !== ingredient));
     };
 
-    const handleRecipeClick = (recipe) => {
+    const handleRecipeClick = (recipe: Recipe) => {
         setActiveRecipe(recipe);
     };
 
     const handleClearAllClick = () => {
         setMainIngredient('');
-        setIngredients([]);
-        setMainIngredientOptions([]);
         setActiveRecipe(null);
         setMealsByIngredient([]);
     };
@@ -154,19 +140,10 @@ const App = () => {
                 <h1>Recip-e-asy</h1>
                 <div>
                     <p>What is your main ingredient?</p>
-                    <input type='text' value={mainIngredient} onChange={handleMainIngredientInput} />
+                    <input type='text' value={mainIngredient} onChange={(e) => setMainIngredient(e.target.value)} />
                     {mainIngredient ? <button onClick={handleClearAllClick}>X</button> : null}
                     <div>
-                        {MainingredientNotFoundError
-                            ? <div>Nothing found</div>
-                            : mainIngredientOptions.map(opt => {
-                                return <div key={opt.strIngredient}>
-                                    <button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
-                                        {opt.strIngredient}
-                                    </button>
-                                </div>;
-                            })
-                        }
+                        {renderMainIngredientOptions()}
                     </div>
                     <p>What other ingredients do you have? Add them one by one</p>
                     <input type='text' onChange={handleOtherIngredientInput} />
