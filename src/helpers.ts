@@ -1,4 +1,4 @@
-import { IngredientWithMeasure, Recipe, RecipeRaw } from './types';
+import { Ingredient, IngredientWithMeasure, Recipe, RecipeRaw } from './types';
 
 export const INGREDIENTS_LIST_URL = 'https://www.themealdb.com/api/json/v1/1/list.php?i=list';
 export const MEAL_LOOKUP_URL = 'https://www.themealdb.com/api/json/v1/1/lookup.php?i=';
@@ -35,4 +35,30 @@ export const processRecipe = (recipe: RecipeRaw): Recipe => {
         ingredients,
         ingredientsWithMeasures,
     };
+};
+
+export const sortMealsByMatchingIngredients = (setMealsByIngredient, usersIngredients: string[]) => {
+    setMealsByIngredient((prev: Recipe[]) => {
+        return prev.sort((a: Recipe, b: Recipe) => {
+            const aMatching = getMatchingIngredientsNumber(usersIngredients, a.ingredients);
+            const bMatching = getMatchingIngredientsNumber(usersIngredients, b.ingredients);
+            return bMatching - aMatching;
+        });
+    });
+};
+
+export const getMatchingIngredientsNumber = (usersIngredients: string[], recipeIngredients: string[]) => {
+    let count = 0;
+    for (const ingredient of usersIngredients) {
+        if (recipeIngredients.includes(ingredient)) {
+            count++;
+        }
+    }
+    return count;
+};
+
+export const getOptions = (input: string, ingredients: Ingredient[]) => {
+    return input.length
+        ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(input))
+        : ingredients.slice(0, 14); // Always return some ingredients, unless nothing can be found
 };

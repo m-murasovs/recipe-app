@@ -1,22 +1,24 @@
-import React, { ChangeEvent, useCallback, useEffect, useState } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
 import './App.css';
 import { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types';
-import { getMealByIngredientUrl, INGREDIENTS_LIST_URL, MEAL_LOOKUP_URL, processRecipe } from './helpers';
+import { getMatchingIngredientsNumber, getMealByIngredientUrl, getOptions, INGREDIENTS_LIST_URL, MEAL_LOOKUP_URL, processRecipe, sortMealsByMatchingIngredients } from './helpers';
+import { Grid2, Box, Container, Typography, Button, TextField } from '@mui/material';
+import { IngredientsWrapper } from './components/wrappers';
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-
     const [mainIngredient, setMainIngredient] = useState('');
 
     const [mealsByIngredient, setMealsByIngredient] = useState<Recipe[]>([]);
     // The error shows the ingredient we couldn't find any meals for
     const [mealsByIngredientError, setMealsByIngredientError] = useState('');
 
-    const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
+    const [otherIngredientInputValue, setOtherIngredientInputValue] = useState('');
     const [otherIngredients, setOtherIngredients] = useState<string[]>([]);
-    const [otherIngredientOptions, setOtherIngredientOptions] = useState<Ingredient[]>([]);
+
+    const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
 
     useEffect(() => {
         const fetchIngredients = async () => {
@@ -40,23 +42,28 @@ const App = () => {
 
     /** Get the ingredients that start with the input */
     const renderMainIngredientOptions = () => {
-        const options = mainIngredient.length
-            ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(mainIngredient.toLowerCase()))
-            : [];
+        const options = getOptions(mainIngredient, ingredients);
 
-        if (mainIngredient.length && !options.length) return <div>Nothing found</div>;
+        if (mainIngredient.length && !options.length) {
+            return <div>We don't have any recipes for <strong>{mainIngredient}</strong></div>;
+        }
 
         return options.map(opt => {
             return <div key={opt.strIngredient}>
-                <button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
+                <Button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
                     {opt.strIngredient}
-                </button>
+                </Button>
             </div>;
         });
     };
 
+    /**
+     * When the user selects the main ingredient, we fetch all the meals that can be made with it
+     */
     const handleMainIngredientButtonClick = async (ingredient: string) => {
-        setMainIngredient(ingredient);
+        if (mainIngredient.toLowerCase() === ingredient.toLowerCase()) return;
+
+        setMainIngredient(ingredient.toLowerCase());
         const mealByIngredientUrl = getMealByIngredientUrl(ingredient);
 
         try {
@@ -94,108 +101,137 @@ const App = () => {
         }
     };
 
-    const handleOtherIngredientInput = (e: ChangeEvent<HTMLInputElement>) => {
-        e.preventDefault();
-        const value = e.target.value.toLowerCase();
+    const renderOtherIngredientOptions = () => {
+        const options = getOptions(otherIngredientInputValue, ingredients);
 
-        const options = value
-            ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(value))
-            : [];
-
-        setOtherIngredientOptions(options);
+        return options.map(opt => {
+            return <div key={opt.strIngredient}>
+                <Button onClick={() => handleOtherIngredientClick(opt.strIngredient)}>
+                    {opt.strIngredient}
+                </Button>
+            </div>;
+        })
     };
 
     const handleOtherIngredientClick = (ingredient: string) => {
-        // Only add the other ingredients once
-        setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient]);
-    };
+        //Only add the ingredient once
+        setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient])
 
-    const handleDeleteOtherIngredient = (ingredient: string) => {
-        setOtherIngredients(prev => prev.filter(item => item !== ingredient));
-    };
+        // Sort the available meals by most compatible
+        if (mealsByIngredient.length) sortMealsByMatchingIngredients(setMealsByIngredient, [mainIngredient, ...otherIngredients]);
 
-    const handleRecipeClick = (recipe: Recipe) => {
-        setActiveRecipe(recipe);
-    };
+        setOtherIngredientInputValue('');
+    }
 
     const handleClearAllClick = () => {
         setMainIngredient('');
+        setOtherIngredients([]);
         setActiveRecipe(null);
         setMealsByIngredient([]);
     };
 
-    const getMatchingIngredientsNumberForRecipe = (recipe: Recipe) => {
-        const allIngredients = [mainIngredient, ...otherIngredients];
-        let count = 0;
-        for (let i = 0; i < allIngredients.length; i++) {
-            if (recipe.ingredients.includes(allIngredients[i])) count++;
-        }
-        return count;
-    }
-
     return (
-        <>
-            <div>
-                {isLoading && <div><img src='/favicon.ico' />Loading</div>}
-                <h1>Recip-e-asy</h1>
-                <div>
-                    <p>What is your main ingredient?</p>
-                    <input type='text' value={mainIngredient} onChange={(e) => setMainIngredient(e.target.value)} />
-                    {mainIngredient ? <button onClick={handleClearAllClick}>X</button> : null}
-                    <div>
-                        {renderMainIngredientOptions()}
-                    </div>
-                    <p>What other ingredients do you have? Add them one by one</p>
-                    <input type='text' onChange={handleOtherIngredientInput} />
-                    {otherIngredients.map(ingr => {
-                        return <p key={ingr}>
-                            {ingr}
-                            <button onClick={(e) => handleDeleteOtherIngredient(ingr)}>X</button>
-                        </p>;
-                    })}
-                    {otherIngredientOptions.length
-                        ? otherIngredientOptions.map(opt => {
-                            return <div key={opt.strIngredient}>
-                                <button onClick={() => handleOtherIngredientClick(opt.strIngredient)}>
-                                    {opt.strIngredient}
-                                </button>
-                            </div>;
-                        })
-                        : null
-                    }
-                    {/* Display the items here. These should be clearable. */}
-                    {/* That should give us all the functionality we need. After that, we juse tidy up the code, add thests, and do the visuals */}
+        <Container sx={{ width: '100%', minHeight: '100%', height: '100vh', margin: '2rem', }}>
+            <main>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }} mb='3rem'>
+                    <img
+                        src='/favicon.ico'
+                        width={80}
+                        height={80}
+                        className={`${isLoading ? 'logo-spin' : ''} logo`}
+                    />
+                    <Typography variant='h1' sx={{ fontSize: { xs: '3rem', md: '5rem' } }}>
+                        Recip-e-asy
+                    </Typography>
+                </Box>
 
-                    <div>
+                <Grid2 container spacing={2}>
+                    <Grid2 size={{ xs: 12, md: 6 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <Typography variant='h2' sx={{ fontSize: '1.3rem' }}>
+                                What is your main ingredient?
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                                <TextField
+                                    type='text'
+                                    value={mainIngredient}
+                                    onChange={(e) => setMainIngredient(e.target.value)}
+                                    placeholder='Search main ingredient'
+                                />
+                                {mainIngredient
+                                    ? <Button onClick={handleClearAllClick}>X</Button>
+                                    : null
+                                }
+                            </Box>
+                        </Box>
+                        <IngredientsWrapper>
+                            {renderMainIngredientOptions()}
+                        </IngredientsWrapper>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'left', flexWrap: 'wrap' }} mt='2rem'>
+                            <Typography variant='h2' sx={{ fontSize: '1.3rem' }}>
+                                What other ingredients do you have? Add them one by one.
+                            </Typography>
+                            <TextField
+                                type='text'
+                                onChange={(e) => setOtherIngredientInputValue(e.target.value)}
+                                placeholder='Search other ingredients'
+                                value={otherIngredientInputValue}
+                            />
+                        </Box>
+                        <IngredientsWrapper>
+                            {otherIngredients.map(ingr => {
+                                return <Typography key={ingr}>
+                                    {ingr}
+                                    <Button
+                                        onClick={() => setOtherIngredients(prev => prev.filter(item => item !== ingr))}
+                                        size='small'
+                                        sx={{ padding: '0.2rem', minWidth: '2rem', marginLeft: '0.2rem', marginRight: '0.5rem' }}
+                                    >
+                                        X
+                                    </Button>
+                                </Typography>;
+                            })}
+                        </IngredientsWrapper>
+
+                        <IngredientsWrapper>
+                            {renderOtherIngredientOptions()}
+                        </IngredientsWrapper>
+                    </Grid2>
+
+                    <Grid2 size={{ xs: 12, md: 6 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
                         {mealsByIngredientError
                             ? <div>No meals for <strong>{mealsByIngredientError}</strong> found</div>
                             : mealsByIngredient.map(meal => {
-                                return <div key={meal.strMeal}>
+                                return <div>
                                     <div>
                                         <img src={`${meal.strMealThumb}`} width={40} alt={meal.strMeal} />
                                     </div>
-                                    <button onClick={(e) => handleRecipeClick(meal)}>
+                                    <Button onClick={() => setActiveRecipe(meal)}>
                                         {meal.strMeal}
-                                    </button>
+                                    </Button>
                                     {/* TODO: maybe color this according to how many ingredients you have <30% red, 30-70% yellow, rest green  */}
-                                    <p>Ingredients matching: {getMatchingIngredientsNumberForRecipe(meal)} out of {meal.ingredients.length}</p>
-                                </div>;
+                                    {/* TODO: definitely sort this by most ingredients available */}
+                                    <p>Ingredients matching: {
+                                        getMatchingIngredientsNumber([mainIngredient, ...otherIngredients], meal.ingredients)
+                                    } out of {meal.ingredients.length}</p>
+                                </ div>;
                             })
                         }
-                    </div>
+                        </Box>
 
-                    <div>
                         {activeRecipe
                             ? <div>
                                 {activeRecipe.ingredients.map(ing => <span>{ing}</span>)}
-                                <p>{activeRecipe.strInstructions}</p>
+                                <Typography>{activeRecipe.strInstructions}</Typography>
                             </div>
                             : null
                         }
-                    </div>
-                </div>
-            </div>
-        </>
+                    </Grid2>
+                </Grid2>
+            </main>
+        </Container >
     );
 };
 
