@@ -41,3 +41,8 @@ So, the user will select the meal and we'll fetch it by ID. Then we'll show how 
 
 To be fancy, we could fetch all the meals on the list for that ingredient and rank them by how many of the ingredients match
 
+## showing ingredients
+
+Maybe we could show two buttons - one for main ingredient, the other for other stuff. single text input that will show the ingredients and add them to array?
+
+Then we press search
