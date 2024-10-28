@@ -1,93 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { ChangeEvent, MouseEventHandler, useEffect, useState } from 'react';
 import './App.css';
-
-interface Ingredient {
-    idIngredient: string;
-    strIngredient: string;
-    strDescription: string;
-}
-
-interface MealByIngredient {
-    strMeal: string;
-    strMealThumb: string;
-    idMeal: string;
-}
-
-interface RecipeRaw {
-    idMeal: string;
-    strMeal: string;
-    strDrinkAlternate: string;
-    strCategory: string;
-    strArea: string;
-    strInstructions: string;
-    strMealThumb: string;
-    strTags: string;
-    strYoutube: string;
-    [key: string]: string;
-}
-
-interface IngredientWithMeasure {
-    item: string;
-    measure: string;
-};
-
-interface Recipe {
-    idMeal: string;
-    strMeal: string;
-    strArea: string;
-    strInstructions: string;
-    strMealThumb: string;
-    strYoutube: string;
-    ingredients: string[];
-    ingredientsWithMeasures: IngredientWithMeasure[];
-}
-
-const INGREDIENTS_LIST_URL = 'https://www.themealdb.com/api/json/v1/1/list.php?i=list';
-const MEAL_BY_INGREDIENT_URL = 'https://www.themealdb.com/api/json/v1/1/filter.php?i=';
-const MEAL_LOOKUP_URL = 'https://www.themealdb.com/api/json/v1/1/lookup.php?i=';
-
-const getMealByIngredientUrl = (ingredient) => {
-    return `${MEAL_BY_INGREDIENT_URL}${ingredient.toLowerCase().replace(' ', '_')}`;
-};
-
-/**
- * Transform the recipes into usable objects, where the ingredients are an array
- */
-const processRecipe = (recipe: RecipeRaw): Recipe => {
-    const ingredients: string[] = [];
-    const ingredientsWithMeasures: IngredientWithMeasure[] = [];
-
-    for (let i = 1; i <= 20; i++) {
-        const item = recipe[`strIngredient${i}`];
-        const measure = recipe[`strMeasure${i}`];
-        if (!item) {
-            break;
-        }
-        ingredients.push(item);
-        ingredientsWithMeasures.push({ item, measure });
-    }
-    console.log('recipe', recipe)
-    return {
-        idMeal: recipe.idMeal,
-        strMeal: recipe.strMeal,
-        strArea: recipe.strArea,
-        strInstructions: recipe.strInstructions,
-        strMealThumb: recipe.strMealThumb,
-        strYoutube: recipe.strYoutube,
-        ingredients,
-        ingredientsWithMeasures,
-    };
-};
+import { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types';
+import { getMealByIngredientUrl, INGREDIENTS_LIST_URL, MEAL_LOOKUP_URL, processRecipe } from './helpers';
 
 const App = () => {
-    const [ingredients, setIngredients] = useState<Ingredient[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+
     const [mainIngredient, setMainIngredient] = useState('');
     const [mainIngredientOptions, setMainIngredientOptions] = useState<Ingredient[]>([]);
     const [MainingredientNotFoundError, setMainIngredientNotFoundError] = useState(false);
+
     const [mealsByIngredient, setMealsByIngredient] = useState<Recipe[]>([]);
     // The error shows the ingredient we couldn't find any meals for
     const [mealsByIngredientError, setMealsByIngredientError] = useState('');
+
     const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
     const [otherIngredients, setOtherIngredients] = useState<string[]>([]);
     const [otherIngredientOptions, setOtherIngredientOptions] = useState<Ingredient[]>([]);
@@ -113,9 +41,9 @@ const App = () => {
     }, []); // Load ingredients only once
 
     /**
-     * Gets the ingredients that start with the input
+     * Get the ingredients that start with the input
      */
-    const handleMainIngredientInput = (e) => {
+    const handleMainIngredientInput = (e: ChangeEvent<HTMLInputElement>) => {
         e.preventDefault();
         setMainIngredient(e.target.value);
         const value = e.target.value.toLowerCase();
@@ -138,10 +66,9 @@ const App = () => {
         };
     };
 
-    const handleMainIngredientButtonClick = async (e) => {
-        e.preventDefault();
-        setMainIngredient(e.target.innerText);
-        const mealByIngredientUrl = getMealByIngredientUrl(e.target.innerText);
+    const handleMainIngredientButtonClick = async (ingredient) => {
+        setMainIngredient(ingredient);
+        const mealByIngredientUrl = getMealByIngredientUrl(ingredient);
 
         try {
             setIsLoading(true);
@@ -153,7 +80,7 @@ const App = () => {
 
             // If there aren't any meals for this ingredient, we'll show a message
             if (!data.meals) {
-                setMealsByIngredientError(e.target.innerText);
+                setMealsByIngredientError(ingredient);
                 return;
             }
 
@@ -179,7 +106,7 @@ const App = () => {
         }
     };
 
-    const handleOtherIngredientInput = (e) => {
+    const handleOtherIngredientInput = (e: ChangeEvent<HTMLInputElement>) => {
         e.preventDefault();
         const value = e.target.value.toLowerCase();
 
@@ -190,25 +117,20 @@ const App = () => {
         setOtherIngredientOptions(options);
     };
 
-    const handleOtherIngredientClick = (e) => {
-        e.preventDefault();
-        const value = e.target.innerText;
+    const handleOtherIngredientClick = (ingredient) => {
         // Only add the other ingredients once
-        setOtherIngredients(prev => prev.includes(value) ? prev : [...prev, value]);
+        setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient]);
     };
 
-    const handleDeleteOtherIngredient = (e, ingredient) => {
-        e.preventDefault();
+    const handleDeleteOtherIngredient = (ingredient: string) => {
         setOtherIngredients(prev => prev.filter(item => item !== ingredient));
     };
 
-    const handleRecipeClick = (e, recipe) => {
-        e.preventDefault();
+    const handleRecipeClick = (recipe) => {
         setActiveRecipe(recipe);
     };
 
-    const handleClearClick = (e) => {
-        e.preventDefault();
+    const handleClearAllClick = () => {
         setMainIngredient('');
         setIngredients([]);
         setMainIngredientOptions([]);
@@ -233,13 +155,13 @@ const App = () => {
                 <div>
                     <p>What is your main ingredient?</p>
                     <input type='text' value={mainIngredient} onChange={handleMainIngredientInput} />
-                    {mainIngredient ? <button onClick={handleClearClick}>X</button> : null}
+                    {mainIngredient ? <button onClick={handleClearAllClick}>X</button> : null}
                     <div>
                         {MainingredientNotFoundError
                             ? <div>Nothing found</div>
                             : mainIngredientOptions.map(opt => {
                                 return <div key={opt.strIngredient}>
-                                    <button onClick={handleMainIngredientButtonClick}>
+                                    <button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
                                         {opt.strIngredient}
                                     </button>
                                 </div>;
@@ -251,13 +173,13 @@ const App = () => {
                     {otherIngredients.map(ingr => {
                         return <p key={ingr}>
                             {ingr}
-                            <button onClick={(e) => handleDeleteOtherIngredient(e, ingr)}>X</button>
+                            <button onClick={(e) => handleDeleteOtherIngredient(ingr)}>X</button>
                         </p>;
                     })}
                     {otherIngredientOptions.length
                         ? otherIngredientOptions.map(opt => {
                             return <div key={opt.strIngredient}>
-                                <button onClick={handleOtherIngredientClick}>
+                                <button onClick={() => handleOtherIngredientClick(opt.strIngredient)}>
                                     {opt.strIngredient}
                                 </button>
                             </div>;
@@ -275,7 +197,7 @@ const App = () => {
                                     <div>
                                         <img src={`${meal.strMealThumb}`} width={40} alt={meal.strMeal} />
                                     </div>
-                                    <button onClick={(e) => handleRecipeClick(e, meal)}>
+                                    <button onClick={(e) => handleRecipeClick(meal)}>
                                         {meal.strMeal}
                                     </button>
                                     {/* TODO: maybe color this according to how many ingredients you have <30% red, 30-70% yellow, rest green  */}
