@@ -1,13 +1,13 @@
 import { Ingredient, IngredientWithMeasure, Recipe, RecipeRaw } from './types';
 
 export const ingredientsWrapperProps = {
+    m: '1rem 0',
     sx: {
         display: 'flex',
         alignItems: 'center',
         gap: '.5rem',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
     },
-    m: '1rem 0'
 }
 /**
  * Transform the recipes into usable objects, where the ingredients are an array
