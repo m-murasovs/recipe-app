@@ -1,7 +1,7 @@
-import React, { ChangeEvent, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
-import { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types';
-import { getMatchingIngredientsNumber, getOptions, consolidateIngredients, sortMealsByMatchingIngredients, ingredientsWrapperProps } from './helpers';
+import type { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types.ts';
+import { getMatchingIngredientsNumber, getOptions, consolidateIngredients, sortMealsByMatchingIngredients, ingredientsWrapperProps } from './helpers.ts';
 import { Grid2, Box, Container, Typography, Button, TextField, Card, CardMedia, CardActionArea, CardContent, List, ListItem, Link } from '@mui/material';
 
 const App = () => {
@@ -10,9 +10,9 @@ const App = () => {
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
     const [mainIngredient, setMainIngredient] = useState('');
 
-    const [mealsByIngredient, setMealsByIngredient] = useState<Recipe[]>([]);
+    const [recipesByIngredient, setRecipesByIngredient] = useState<Recipe[]>([]);
     // The error shows the ingredient we couldn't find any meals for
-    const [mealsByIngredientError, setMealsByIngredientError] = useState('');
+    const [recipesByIngredientError, setRecipesByIngredientError] = useState('');
 
     const [otherIngredientInputValue, setOtherIngredientInputValue] = useState('');
     const [otherIngredients, setOtherIngredients] = useState<string[]>([]);
@@ -43,7 +43,6 @@ const App = () => {
     /** Get the ingredients that start with the input */
     const renderMainIngredientOptions = () => {
         const options = getOptions(mainIngredient.toLowerCase(), ingredients);
-
         if (mainIngredient.length && !options.length) {
             return <div>No recipes found for <strong>{mainIngredient}</strong></div>;
         };
@@ -75,7 +74,7 @@ const App = () => {
             if (!response.ok) throw new Error(`Error while fetching meal: ${response.status}`);
             const data = await response.json() as { meals: MealByIngredient[]; };
             if (!data.meals) {
-                setMealsByIngredientError(mainIngredient);
+                setRecipesByIngredientError(mainIngredient);
                 return;
             }
 
@@ -94,8 +93,8 @@ const App = () => {
                 [mainIngredient, ...otherIngredients]
             );
 
-            setMealsByIngredientError('');
-            setMealsByIngredient(sortedRecipes);
+            setRecipesByIngredientError('');
+            setRecipesByIngredient(sortedRecipes);
         } catch (error) {
             console.error(error);
         } finally {
@@ -132,7 +131,7 @@ const App = () => {
         setMainIngredient('');
         setOtherIngredients([]);
         setActiveRecipe(null);
-        setMealsByIngredient([]);
+        setRecipesByIngredient([]);
     };
 
     const handleActiveRecipeClick = (recipe: Recipe) => {
@@ -221,11 +220,11 @@ const App = () => {
                     {/* This part displays the available meals for the main ingredient */}
                     <Grid2 size={{ xs: 12, md: 8 }}>
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
-                            {mealsByIngredientError
+                            {recipesByIngredientError
                                 ? <Typography component='p'>
-                                    No meals for <strong>{mealsByIngredientError}</strong> found
+                                    No meals for <strong>{recipesByIngredientError}</strong> found
                                 </Typography>
-                                : mealsByIngredient.map(meal => {
+                                : recipesByIngredient.map(meal => {
                                     return <Card key={meal.idMeal} sx={{ width: 240, height: 230 }}>
                                         <CardActionArea onClick={() => handleActiveRecipeClick(meal)}>
                                             <CardMedia
@@ -250,7 +249,7 @@ const App = () => {
 
                         <div id='recipe-title-placeholder' />
                         {activeRecipe
-                            ? <Box mb='3rem'>
+                            ? <Box mb='3rem' data-test='active-recipe'>
                                 <Typography variant='h4'>
                                     {activeRecipe.strMeal}
                                 </Typography>

@@ -1,5 +1,6 @@
-import { Ingredient, IngredientWithMeasure, Recipe, RecipeRaw } from './types';
+import { Ingredient, IngredientWithMeasure, Recipe, RecipeRaw } from './types.ts';
 
+// This is the only reused component, so it's not worth extracting it into a separate file
 export const ingredientsWrapperProps = {
     m: '1rem 0',
     sx: {
@@ -59,6 +60,6 @@ export const getMatchingIngredientsNumber = (usersIngredients: string[], recipeI
 
 export const getOptions = (input: string, ingredients: Ingredient[]) => {
     return input.length
-        ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(input))
+        ? ingredients.filter((item) => item.strIngredient.toLowerCase().startsWith(input.toLowerCase()))
         : ingredients.slice(0, 14); // Always return some ingredients, unless nothing can be found
 };

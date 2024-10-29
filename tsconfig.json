@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "module": "NodeNext",
+        "strict": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "allowSyntheticDefaultImports": true,
+        "noEmit": true,
+        "allowImportingTsExtensions": true,
+        "jsx": "react"
+    },
+    "include": [
+        "src",
+        "test"
+    ],
+    "exclude": [
+        "node_modules"
+    ],
+    "rules": {
+        "semi": [
+            "error",
+            "always"
+        ],
+    }
+}
