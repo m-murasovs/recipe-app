@@ -247,7 +247,8 @@ const App = () => {
                             }
                         </Box>
 
-                        <div id='recipe-title-placeholder' />
+                        {/* Recipe */}
+                        <div id='recipe-title-placeholder' />{/* Workaround so we can scroll to the recipe without waiting for it to render */}
                         {activeRecipe
                             ? <Box mb='3rem' data-test='active-recipe'>
                                 <Typography variant='h4'>
