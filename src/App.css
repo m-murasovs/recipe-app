@@ -1,25 +1,36 @@
 #root {
     text-align: left;
+    width: 100%;
 }
 
 .logo {
     will-change: filter;
-        transition: filter 300ms;
+    transition: filter 300ms;
+    width: 50px;
+    height: 50px;
+    
+}
+    
+@media (min-width: 900px) {
+    .logo {
+        width: 80px;
+        height: 80px;
+    }
 }
 
 @keyframes logo-spin {
     from {
-            transform: rotate(0deg);
-        }
+        transform: rotate(0deg);
+    }
 
-        to {
-            transform: rotate(360deg);
-        }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @media (prefers-reduced-motion: no-preference) {
     .logo-spin {
-            animation: logo-spin infinite 2s linear;
-        }
+        animation: logo-spin infinite 2s linear;
+    }
 }
 

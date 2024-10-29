@@ -1,9 +1,8 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import './App.css';
 import { Ingredient, Recipe, RecipeRaw, MealByIngredient } from './types';
-import { getMatchingIngredientsNumber, getMealByIngredientUrl, getOptions, INGREDIENTS_LIST_URL, MEAL_LOOKUP_URL, processRecipe, sortMealsByMatchingIngredients } from './helpers';
-import { Grid2, Box, Container, Typography, Button, TextField } from '@mui/material';
-import { IngredientsWrapper } from './components/wrappers';
+import { getMatchingIngredientsNumber, getOptions, consolidateIngredients, sortMealsByMatchingIngredients, ingredientsWrapperProps } from './helpers';
+import { Grid2, Box, Container, Typography, Button, TextField, Card, CardMedia, CardActionArea, CardContent, List, ListItem, Link } from '@mui/material';
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -20,11 +19,12 @@ const App = () => {
 
     const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
 
+    // Load the ingredients on render
     useEffect(() => {
         const fetchIngredients = async () => {
             try {
                 setIsLoading(true);
-                const response = await fetch(INGREDIENTS_LIST_URL);
+                const response = await fetch('https://www.themealdb.com/api/json/v1/1/list.php?i=list');
                 if (!response.ok) {
                     throw new Error(`Error while fetching ingredients: ${response.status}`);
                 }
@@ -38,50 +38,48 @@ const App = () => {
         };
 
         fetchIngredients();
-    }, []); // Load ingredients only once
+    }, []); // Load only once
 
     /** Get the ingredients that start with the input */
     const renderMainIngredientOptions = () => {
-        const options = getOptions(mainIngredient, ingredients);
+        const options = getOptions(mainIngredient.toLowerCase(), ingredients);
 
         if (mainIngredient.length && !options.length) {
-            return <div>We don't have any recipes for <strong>{mainIngredient}</strong></div>;
-        }
+            return <div>No recipes found for <strong>{mainIngredient}</strong></div>;
+        };
 
         return options.map(opt => {
-            return <div key={opt.strIngredient}>
-                <Button onClick={() => handleMainIngredientButtonClick(opt.strIngredient)}>
-                    {opt.strIngredient}
-                </Button>
-            </div>;
+            return <Button
+                key={opt.strIngredient}
+                onClick={() => setMainIngredient(opt.strIngredient)}
+                variant='outlined'
+                disabled={mainIngredient === opt.strIngredient}
+            >
+                {opt.strIngredient}
+            </Button>
         });
     };
 
-    /**
-     * When the user selects the main ingredient, we fetch all the meals that can be made with it
-     */
-    const handleMainIngredientButtonClick = async (ingredient: string) => {
-        if (mainIngredient.toLowerCase() === ingredient.toLowerCase()) return;
-
-        setMainIngredient(ingredient.toLowerCase());
-        const mealByIngredientUrl = getMealByIngredientUrl(ingredient);
+    /** Fetch and process the possible recipes for the main ingredient */
+    const handleSearch = async () => {
+        if (!mainIngredient) {
+            return;
+        }
 
         try {
             setIsLoading(true);
-            const response = await fetch(mealByIngredientUrl);
-            if (!response.ok) {
-                throw new Error(`Error while fetching meal: ${response.status}`);
-            }
-            const data = await response.json() as { meals: MealByIngredient[]; };
 
-            // If there aren't any meals for this ingredient, we'll show a message
+            const response = await fetch(
+                `https://www.themealdb.com/api/json/v1/1/filter.php?i=${mainIngredient.toLowerCase().replace(' ', '_')}`
+            );
+            if (!response.ok) throw new Error(`Error while fetching meal: ${response.status}`);
+            const data = await response.json() as { meals: MealByIngredient[]; };
             if (!data.meals) {
-                setMealsByIngredientError(ingredient);
+                setMealsByIngredientError(mainIngredient);
                 return;
             }
 
-            // Fetch the recipes for the possible meals and process them
-            const mealUrls = data.meals.map(meal => `${MEAL_LOOKUP_URL}${meal.idMeal}`);
+            const mealUrls = data.meals.map(meal => `https://www.themealdb.com/api/json/v1/1/lookup.php?i=${meal.idMeal}`);
             const recipes = await Promise.all(
                 mealUrls.map(async (url) => {
                     const response = await fetch(url);
@@ -90,10 +88,14 @@ const App = () => {
                     return recipeData.meals[0];
                 })
             );
-            const processedRecipes = recipes.map(rec => processRecipe(rec));
+            const recipesWithConsolidatedIngredients = recipes.map(rec => consolidateIngredients(rec));
+            const sortedRecipes = sortMealsByMatchingIngredients(
+                recipesWithConsolidatedIngredients,
+                [mainIngredient, ...otherIngredients]
+            );
 
             setMealsByIngredientError('');
-            setMealsByIngredient(processedRecipes);
+            setMealsByIngredient(sortedRecipes);
         } catch (error) {
             console.error(error);
         } finally {
@@ -104,22 +106,25 @@ const App = () => {
     const renderOtherIngredientOptions = () => {
         const options = getOptions(otherIngredientInputValue, ingredients);
 
+        if (otherIngredientInputValue.length && !options.length) {
+            return <div><strong>{otherIngredientInputValue}</strong> not found</div>;
+        };
+
         return options.map(opt => {
-            return <div key={opt.strIngredient}>
-                <Button onClick={() => handleOtherIngredientClick(opt.strIngredient)}>
-                    {opt.strIngredient}
-                </Button>
-            </div>;
-        })
+            return <Button
+                key={opt.strIngredient}
+                onClick={() => handleOtherIngredientClick(opt.strIngredient)}
+                variant='outlined'
+                disabled={otherIngredients.includes(opt.strIngredient)}
+            >
+                {opt.strIngredient}
+            </Button>
+        });
     };
 
     const handleOtherIngredientClick = (ingredient: string) => {
-        //Only add the ingredient once
-        setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient])
-
-        // Sort the available meals by most compatible
-        if (mealsByIngredient.length) sortMealsByMatchingIngredients(setMealsByIngredient, [mainIngredient, ...otherIngredients]);
-
+        // Only add the ingredient once
+        setOtherIngredients(prev => prev.includes(ingredient) ? prev : [...prev, ingredient]);
         setOtherIngredientInputValue('');
     }
 
@@ -130,23 +135,29 @@ const App = () => {
         setMealsByIngredient([]);
     };
 
+    const handleActiveRecipeClick = (recipe: Recipe) => {
+        setActiveRecipe(recipe);
+        document.getElementById('recipe-title-placeholder')!.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+
     return (
-        <Container sx={{ width: '100%', minHeight: '100%', height: '100vh', margin: '2rem', }}>
+        <Container sx={{ minWidth: '100%', minHeight: '100%', height: '100vh', margin: '2rem' }}>
             <main>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }} mb='3rem'>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }} mb='1rem'>
                     <img
                         src='/favicon.ico'
-                        width={80}
-                        height={80}
+                        alt='Recip-e-asy logo'
                         className={`${isLoading ? 'logo-spin' : ''} logo`}
                     />
-                    <Typography variant='h1' sx={{ fontSize: { xs: '3rem', md: '5rem' } }}>
+                    <Typography variant='h1' sx={{ fontSize: { xs: '3rem', md: '5rem' } }} gutterBottom>
                         Recip-e-asy
                     </Typography>
                 </Box>
 
-                <Grid2 container spacing={2}>
+                {/* This part displays the search mechanism */}
+                <Grid2 container spacing={4} columns={16}>
                     <Grid2 size={{ xs: 12, md: 6 }}>
+                        {/* Main ingredient */}
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
                             <Typography variant='h2' sx={{ fontSize: '1.3rem' }}>
                                 What is your main ingredient?
@@ -156,7 +167,7 @@ const App = () => {
                                     type='text'
                                     value={mainIngredient}
                                     onChange={(e) => setMainIngredient(e.target.value)}
-                                    placeholder='Search main ingredient'
+                                    placeholder='Type main ingredient'
                                 />
                                 {mainIngredient
                                     ? <Button onClick={handleClearAllClick}>X</Button>
@@ -164,10 +175,11 @@ const App = () => {
                                 }
                             </Box>
                         </Box>
-                        <IngredientsWrapper>
+                        <Box sx={ingredientsWrapperProps.sx} m={ingredientsWrapperProps.m}>
                             {renderMainIngredientOptions()}
-                        </IngredientsWrapper>
+                        </Box>
 
+                        {/* Other ingredients */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'left', flexWrap: 'wrap' }} mt='2rem'>
                             <Typography variant='h2' sx={{ fontSize: '1.3rem' }}>
                                 What other ingredients do you have? Add them one by one.
@@ -175,58 +187,94 @@ const App = () => {
                             <TextField
                                 type='text'
                                 onChange={(e) => setOtherIngredientInputValue(e.target.value)}
-                                placeholder='Search other ingredients'
+                                placeholder='Type other ingredients'
                                 value={otherIngredientInputValue}
                             />
                         </Box>
-                        <IngredientsWrapper>
-                            {otherIngredients.map(ingr => {
-                                return <Typography key={ingr}>
-                                    {ingr}
-                                    <Button
-                                        onClick={() => setOtherIngredients(prev => prev.filter(item => item !== ingr))}
-                                        size='small'
-                                        sx={{ padding: '0.2rem', minWidth: '2rem', marginLeft: '0.2rem', marginRight: '0.5rem' }}
-                                    >
-                                        X
-                                    </Button>
-                                </Typography>;
-                            })}
-                        </IngredientsWrapper>
-
-                        <IngredientsWrapper>
+                        {otherIngredients.length
+                            ? <Box sx={ingredientsWrapperProps.sx} m={ingredientsWrapperProps.m}>
+                                {otherIngredients.map(ingr => {
+                                    return <Typography key={ingr}>
+                                        {ingr}
+                                        <Button
+                                            onClick={() => setOtherIngredients(prev => prev.filter(item => item !== ingr))}
+                                            size='small'
+                                            sx={{ padding: '0.2rem', minWidth: '2rem', marginLeft: '0.2rem', marginRight: '0.5rem' }}
+                                        >
+                                            X
+                                        </Button>
+                                    </Typography>;
+                                })
+                                }
+                            </Box>
+                            : null
+                        }
+                        <Box sx={ingredientsWrapperProps.sx} m={ingredientsWrapperProps.m}>
                             {renderOtherIngredientOptions()}
-                        </IngredientsWrapper>
+                        </Box>
+                        {/* Search */}
+                        <Button onClick={handleSearch} variant='contained' size='large'>
+                            Search
+                        </Button>
                     </Grid2>
 
-                    <Grid2 size={{ xs: 12, md: 6 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                        {mealsByIngredientError
-                            ? <div>No meals for <strong>{mealsByIngredientError}</strong> found</div>
-                            : mealsByIngredient.map(meal => {
-                                return <div>
-                                    <div>
-                                        <img src={`${meal.strMealThumb}`} width={40} alt={meal.strMeal} />
-                                    </div>
-                                    <Button onClick={() => setActiveRecipe(meal)}>
-                                        {meal.strMeal}
-                                    </Button>
-                                    {/* TODO: maybe color this according to how many ingredients you have <30% red, 30-70% yellow, rest green  */}
-                                    {/* TODO: definitely sort this by most ingredients available */}
-                                    <p>Ingredients matching: {
-                                        getMatchingIngredientsNumber([mainIngredient, ...otherIngredients], meal.ingredients)
-                                    } out of {meal.ingredients.length}</p>
-                                </ div>;
-                            })
-                        }
+                    {/* This part displays the available meals for the main ingredient */}
+                    <Grid2 size={{ xs: 12, md: 8 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+                            {mealsByIngredientError
+                                ? <Typography component='p'>
+                                    No meals for <strong>{mealsByIngredientError}</strong> found
+                                </Typography>
+                                : mealsByIngredient.map(meal => {
+                                    return <Card key={meal.idMeal} sx={{ width: 240, height: 230 }}>
+                                        <CardActionArea onClick={() => handleActiveRecipeClick(meal)}>
+                                            <CardMedia
+                                                component='img'
+                                                height='140'
+                                                image={meal.strMealThumb}
+                                                alt={meal.strMeal}
+                                            />
+                                            <CardContent>
+                                                <Typography component='p' noWrap>
+                                                    {meal.strMeal}
+                                                </Typography>
+                                                <Typography component='p' sx={{ color: 'text.secondary' }}>
+                                                    {getMatchingIngredientsNumber([mainIngredient, ...otherIngredients], meal.ingredients)}/{meal.ingredients.length} ingredients available
+                                                </Typography>
+                                            </CardContent>
+                                        </CardActionArea>
+                                    </Card>;
+                                })
+                            }
                         </Box>
 
+                        <div id='recipe-title-placeholder' />
                         {activeRecipe
-                            ? <div>
-                                {activeRecipe.ingredients.map(ing => <span>{ing}</span>)}
-                                <Typography>{activeRecipe.strInstructions}</Typography>
-                            </div>
-                            : null
+                            ? <Box mb='3rem'>
+                                <Typography variant='h4'>
+                                    {activeRecipe.strMeal}
+                                </Typography>
+                                <List>
+                                    {activeRecipe.ingredientsWithMeasures.map(({ item, measure }) => {
+                                        return <ListItem key={item}>
+                                            {/\d/.test(measure)
+                                                ? `${measure} ${item}`
+                                                : `${item} ${measure.toLowerCase()}`
+                                            }
+                                        </ListItem>;
+                                    })}
+                                </List>
+                                <Typography component='p' gutterBottom>
+                                    {activeRecipe.strInstructions}
+                                </Typography>
+                                {activeRecipe.strYoutube
+                                    ? <Typography sx={{ color: 'text.secondary' }}>
+                                        Follow along with the recipe on <Link href={activeRecipe.strYoutube} target='_blank'>YouTube</Link>
+                                    </Typography>
+                                    : null
+                                }
+                            </Box>
+                            : <div id='recipe-title-placeholder' />
                         }
                     </Grid2>
                 </Grid2>

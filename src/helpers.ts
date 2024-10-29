@@ -1,17 +1,18 @@
 import { Ingredient, IngredientWithMeasure, Recipe, RecipeRaw } from './types';
 
-export const INGREDIENTS_LIST_URL = 'https://www.themealdb.com/api/json/v1/1/list.php?i=list';
-export const MEAL_LOOKUP_URL = 'https://www.themealdb.com/api/json/v1/1/lookup.php?i=';
-const MEAL_BY_INGREDIENT_URL = 'https://www.themealdb.com/api/json/v1/1/filter.php?i=';
-
-export const getMealByIngredientUrl = (ingredient: string) => {
-    return `${MEAL_BY_INGREDIENT_URL}${ingredient.toLowerCase().replace(' ', '_')}`;
-};
-
+export const ingredientsWrapperProps = {
+    sx: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '.5rem',
+        flexWrap: 'wrap'
+    },
+    m: '1rem 0'
+}
 /**
  * Transform the recipes into usable objects, where the ingredients are an array
  */
-export const processRecipe = (recipe: RecipeRaw): Recipe => {
+export const consolidateIngredients = (recipe: RecipeRaw): Recipe => {
     const ingredients: string[] = [];
     const ingredientsWithMeasures: IngredientWithMeasure[] = [];
 
@@ -37,20 +38,19 @@ export const processRecipe = (recipe: RecipeRaw): Recipe => {
     };
 };
 
-export const sortMealsByMatchingIngredients = (setMealsByIngredient, usersIngredients: string[]) => {
-    setMealsByIngredient((prev: Recipe[]) => {
-        return prev.sort((a: Recipe, b: Recipe) => {
-            const aMatching = getMatchingIngredientsNumber(usersIngredients, a.ingredients);
-            const bMatching = getMatchingIngredientsNumber(usersIngredients, b.ingredients);
-            return bMatching - aMatching;
-        });
+export const sortMealsByMatchingIngredients = (recipes: Recipe[], usersIngredients: string[]) => {
+    return recipes.sort((a: Recipe, b: Recipe) => {
+        const aMatching = getMatchingIngredientsNumber(usersIngredients, a.ingredients);
+        const bMatching = getMatchingIngredientsNumber(usersIngredients, b.ingredients);
+        return bMatching - aMatching;
     });
 };
 
 export const getMatchingIngredientsNumber = (usersIngredients: string[], recipeIngredients: string[]) => {
     let count = 0;
+    const recipeIngredientsLower = recipeIngredients.map((item) => item.toLowerCase());
     for (const ingredient of usersIngredients) {
-        if (recipeIngredients.includes(ingredient)) {
+        if (recipeIngredientsLower.includes(ingredient.toLowerCase())) {
             count++;
         }
     }
