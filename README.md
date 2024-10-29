@@ -1,6 +1,8 @@
 # Recipe app
 
-Stuck for something to cook? No fear - just input what you have in your fridge and this app will give you a recipe to make with those ingredients!
+An app that returns recipes based on a main ingredient.
 
-> Caveat: The multi-ingredient API is restricted to premium users, so this app will search the recipes by main ingredient, then sort them by available ingredients
+The specification states: "Your friend is a back-end developer and he assures you he can create a RestAPI that
+will return recipes if you query it with the following parameters: ingredients, quantity, available cooking time, number of ingredients and meal type."
 
+Due to the restrictions of the free API, and to keep the UI simple, I narrowed the scope so the app only returns recipes based on a main ingredient. The user can then add other ingredients they have and pick the most compatible recipe. This would be a nice proof of concept, allowing the other features to be added on later.
